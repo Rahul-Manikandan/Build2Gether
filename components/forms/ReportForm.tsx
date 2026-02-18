@@ -78,35 +78,53 @@ export default function ReportForm() {
                         }
                     },
                 });
-                // We can't store File objects directly in some browsers/IndexedDB implementations efficiently without conversion,
-                // but IDB 2.0 supports it. For simplicity, we'll store it as is, assuming modern browser support.
-                // If syncing later, we might need value retrieval logic.
                 await db1.add('reports', { ...reportData, file, synced: false });
                 setMessage('You are offline. Report saved locally and will sync later.');
+                // Reset form
+                setDescription('');
+                clearImage();
             } else {
                 // Upload image if exists
                 let imageUrl = '';
                 if (file) {
-                    const storageRef = ref(storage, `reports/${Date.now()}_${file.name}`);
-                    await uploadBytes(storageRef, file);
-                    imageUrl = await getDownloadURL(storageRef);
+                    try {
+                        console.log('Starting upload...');
+                        // Sanitize filename
+                        const fileExt = file.name.split('.').pop() || 'jpg';
+                        const sanitizedBaseName = file.name.split('.').slice(0, -1).join('.').replace(/[^a-zA-Z0-9]/g, '_');
+                        const fileName = `${Date.now()}_${sanitizedBaseName}.${fileExt}`;
+
+                        const storageRef = ref(storage, `reports/${fileName}`);
+                        console.log('Uploading to:', `reports/${fileName}`);
+
+                        const snapshot = await uploadBytes(storageRef, file);
+                        console.log('Upload successful:', snapshot);
+
+                        imageUrl = await getDownloadURL(storageRef);
+                        console.log('Download URL:', imageUrl);
+                    } catch (uploadError: any) {
+                        console.error('Upload failed:', uploadError);
+                        throw new Error(`Image upload failed: ${uploadError.message}`);
+                    }
                 }
 
                 // Save to Firestore
+                console.log('Saving to Firestore...');
                 await addDoc(collection(db, 'reports'), {
                     ...reportData,
                     imageUrl,
                     synced: true
                 });
                 setMessage('Report submitted successfully!');
+
+                // Reset form
+                setDescription('');
+                clearImage();
             }
 
-            // Reset form
-            setDescription('');
-            clearImage();
-        } catch (err) {
-            console.error(err);
-            setMessage('Failed to submit report. Please try again.');
+        } catch (err: any) {
+            console.error('Submission error:', err);
+            setMessage(`Failed to submit: ${err.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
