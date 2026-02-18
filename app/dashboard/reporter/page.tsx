@@ -4,8 +4,17 @@ import { auth, db } from '@/lib/firebase/config';
 import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, Search, Filter } from 'lucide-react';
+import { Bell, Search, Filter, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function ReporterDashboard() {
     const [user, setUser] = useState<any>(null);
@@ -13,13 +22,12 @@ export default function ReporterDashboard() {
     const [recentReports, setRecentReports] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
-    const [notification, setNotification] = useState<string | null>(null);
+    const [notifications, setNotifications] = useState<any[]>([]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
-                // Real-time listener
                 try {
                     const q = query(collection(db, 'reports'), orderBy('timestamp', 'desc'), limit(20));
 
@@ -34,14 +42,9 @@ export default function ReporterDashboard() {
                             approved: reports.filter((r: any) => r.status === 'approved').length
                         });
 
-                        // Check for resolved notifications (Client-side simulation for now)
-                        const newlyResolved = snapshot.docChanges().find(change =>
-                            change.type === 'modified' && change.doc.data().status === 'resolved'
-                        );
-                        if (newlyResolved) {
-                            setNotification(`Good news! Your report "${newlyResolved.doc.data().description.substring(0, 20)}..." has been resolved.`);
-                            setTimeout(() => setNotification(null), 5000);
-                        }
+                        // Filter for resolved/approved notifications
+                        const resolved = reports.filter((r: any) => r.status === 'resolved' || r.status === 'approved');
+                        setNotifications(resolved);
 
                         setLoading(false);
                     }, (error) => {
@@ -53,7 +56,6 @@ export default function ReporterDashboard() {
                     console.error("Query setup error:", e);
                     setLoading(false);
                 }
-
             } else {
                 setLoading(false);
             }
@@ -76,29 +78,49 @@ export default function ReporterDashboard() {
 
     return (
         <div className="p-6 space-y-8 font-sans relative">
-            {/* Notification Toast */}
-            {notification && (
-                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-full shadow-lg animate-in slide-in-from-top-2">
-                    <div className="flex items-center gap-2">
-                        <Bell className="w-4 h-4" />
-                        <span className="text-sm font-medium">{notification}</span>
-                    </div>
-                </div>
-            )}
-
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Hi {user?.displayName ? user.displayName.split(' ')[0] : 'Reporter'}</h1>
                     <p className="text-slate-500 text-sm">Welcome back!</p>
                 </div>
-                <div className="relative">
-                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100">
-                        <Bell className="w-5 h-5 text-slate-600" />
-                    </div>
-                    {/* Notification Dot */}
-                    <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
-                </div>
+
+                {/* Notification Dropdown */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <div className="relative cursor-pointer">
+                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 hover:bg-slate-50 transition-colors">
+                                <Bell className="w-5 h-5 text-slate-600" />
+                            </div>
+                            {notifications.some(n => n.status === 'resolved') && (
+                                <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+                            )}
+                        </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-80 p-0 rounded-xl shadow-xl border-slate-100">
+                        <DropdownMenuLabel className="p-4 border-b border-slate-50">Notifications</DropdownMenuLabel>
+                        <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                            {notifications.length > 0 ? (
+                                notifications.map((note) => (
+                                    <DropdownMenuItem key={note.id} className="p-3 rounded-lg flex items-start gap-3 cursor-default focus:bg-slate-50">
+                                        <div className={`mt-1 w-2 h-2 rounded-full ${getStatusColor(note.status).split(' ')[0].replace('bg-', 'bg-')}`} />
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium text-slate-900">Report Updated</p>
+                                            <p className="text-xs text-slate-500 line-clamp-2">
+                                                Your report "{note.description}" is marked as <span className="font-bold">{note.status}</span>.
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-1">{new Date(note.timestamp).toLocaleDateString()}</p>
+                                        </div>
+                                    </DropdownMenuItem>
+                                ))
+                            ) : (
+                                <div className="p-8 text-center text-slate-400 text-sm">
+                                    No notifications yet.
+                                </div>
+                            )}
+                        </div>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             {/* Search Bar */}
@@ -122,11 +144,9 @@ export default function ReporterDashboard() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                    {/* Primary Stat Card */}
                     <div className="col-span-1 bg-primary text-white p-5 rounded-3xl shadow-lg shadow-primary/20 flex flex-col justify-between h-40 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-10 -mt-10" />
                         <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full -ml-10 -mb-10" />
-
                         <span className="text-primary-foreground/80 font-medium">Total Reports</span>
                         <div className="text-4xl font-bold">{stats.total}</div>
                         <div className="text-sm opacity-80">This Month</div>
@@ -184,7 +204,6 @@ export default function ReporterDashboard() {
                     ) : (
                         <div className="text-center py-8 text-slate-400 bg-white rounded-3xl border border-dashed border-slate-200">
                             <p>No reports found.</p>
-                            <p className="text-xs mt-1">Try a different search term.</p>
                         </div>
                     )}
                 </div>

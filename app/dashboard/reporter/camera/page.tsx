@@ -33,7 +33,6 @@ export default function CameraPage() {
     const handleSubmit = async () => {
         if (!file) return;
 
-        // 1. Auth Check
         if (!auth.currentUser && !isOffline) {
             alert("You seem to be logged out. Please sign in again.");
             router.push('/signin');
@@ -61,16 +60,18 @@ export default function CameraPage() {
                 await db1.add('reports', { ...reportData, file, synced: false });
                 alert('Saved offline!');
             } else {
-                // 2. Upload with Timeout & Fallback
-                setStatusMsg('Uploading image...');
+                // Upload
+                setStatusMsg('Uploading image (Timeout: 60s)...');
+                console.log("Starting upload to bucket:", storage.app.options.storageBucket);
+
                 try {
                     const fileExt = file.name.split('.').pop() || 'jpg';
                     const fileName = `${Date.now()}_${auth.currentUser?.uid || 'anon'}.${fileExt}`;
                     const storageRef = ref(storage, `reports/${fileName}`);
 
-                    // Create a timeout promise
+                    // Timeout: 60 seconds
                     const timeout = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error("Upload timed out")), 15000)
+                        setTimeout(() => reject(new Error("Upload timed out (60s)")), 60000)
                     );
 
                     const snapshot: any = await Promise.race([
@@ -79,26 +80,23 @@ export default function CameraPage() {
                     ]);
 
                     imageUrl = await getDownloadURL(snapshot.ref);
+                    console.log("Upload success, URL:", imageUrl);
 
                 } catch (uploadError: any) {
                     console.error("Upload failed:", uploadError);
-                    alert(`Image upload failed (${uploadError.message}). Saving report without image.`);
-                    // Continue execution to save the report anyway
+                    alert(`Image upload failed: ${uploadError.message}. Saving report text only.`);
                 }
 
-                // 3. Save to Firestore
                 setStatusMsg('Saving details...');
                 await addDoc(collection(db, 'reports'), {
                     ...reportData,
-                    imageUrl, // will be null if upload failed
+                    imageUrl,
                     synced: true
                 });
             }
 
             setStatusMsg('Success! Redirecting...');
             alert('Report Submitted!');
-
-            // 4. Force Redirect
             window.location.href = '/dashboard/reporter';
 
         } catch (error: any) {
@@ -132,7 +130,6 @@ export default function CameraPage() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
-            {/* Header */}
             <div className="bg-white p-4 flex items-center shadow-sm sticky top-0 z-10">
                 <Button variant="ghost" size="icon" onClick={() => setStep('camera')} disabled={loading}>
                     <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -141,7 +138,6 @@ export default function CameraPage() {
             </div>
 
             <div className="p-4 space-y-6 flex-1">
-                {/* Preview */}
                 <div className="h-64 w-full bg-slate-200 rounded-2xl overflow-hidden shadow-md relative">
                     {previewUrl && (
                         <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
@@ -152,7 +148,6 @@ export default function CameraPage() {
                     </div>
                 </div>
 
-                {/* Form */}
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
@@ -167,7 +162,6 @@ export default function CameraPage() {
                 </div>
             </div>
 
-            {/* Footer Action */}
             <div className="p-4 bg-white border-t border-slate-100">
                 <Button
                     size="lg"
