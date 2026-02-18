@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Orange Theme */
+  --background: #F8F9FA;
+  --foreground: #1E1E2C;
+  
+  /* Primary Orange */
+  --primary: #FF6B00;
+  --primary-foreground: #FFFFFF;
+  
+  /* Secondary / Muted */
+  --secondary: #FFF3E0;
+  --secondary-foreground: #FF6B00;
+  
+  /* Cards */
+  --card: #FFFFFF;
+  --card-foreground: #1E1E2C;
+  
+  /* Borders & Inputs */
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  
+  /* Interactive */
+  --ring: #FF6B00;
+  
+  /* Radius */
+  --radius: 1rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #121212;
+    --foreground: #EDEDED;
+    --card: #1E1E2C;
+    --card-foreground: #EDEDED;
+    --primary: #FF6B00;
+    --primary-foreground: #FFFFFF;
+    --secondary: #2D2D3F;
+    --secondary-foreground: #FF6B00;
+    --border: #2D2D3F;
+    --input: #2D2D3F;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
