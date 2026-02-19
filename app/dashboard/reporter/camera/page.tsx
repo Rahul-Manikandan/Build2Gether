@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, MapPin, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, MapPin, Loader2, Camera, Upload, Image as ImageIcon } from 'lucide-react';
 import CameraCapture from '@/components/forms/CameraCapture';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useOfflineStatus } from '@/hooks/useOfflineStatus';
@@ -17,17 +17,57 @@ export default function CameraPage() {
     const { latitude, longitude } = useGeolocation();
     const isOffline = useOfflineStatus();
 
-    const [step, setStep] = useState<'camera' | 'details'>('camera');
+    // Steps: selection -> camera (optional) -> details
+    const [step, setStep] = useState<'selection' | 'camera' | 'details'>('selection');
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [statusMsg, setStatusMsg] = useState('');
+    const [aiAnalysis, setAiAnalysis] = useState<any>(null);
 
     const handleCapture = (capturedFile: File) => {
         setFile(capturedFile);
         setPreviewUrl(URL.createObjectURL(capturedFile));
         setStep('details');
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0];
+        if (!selectedFile) return;
+
+        setFile(selectedFile);
+        setPreviewUrl(URL.createObjectURL(selectedFile));
+        setLoading(true);
+        setStatusMsg('Analyzing image...');
+
+        try {
+            const formData = new FormData();
+            formData.append("image", selectedFile);
+
+            const response = await fetch("/api/analyze-erosion", {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error("Analysis failed:", data.error);
+                // Continue to details even if analysis fails, but warn user?
+            } else {
+                setAiAnalysis(data);
+                // Pre-fill description with analysis
+                const analysisText = `AI Analysis: ${data.prediction}\nConfidence: ${(data.confidence * 100).toFixed(1)}%\nSoil: ${data.soil_analysis.type} (${data.soil_analysis.color})\nReasoning: ${data.reasoning.join(', ')}`;
+                setDescription(analysisText);
+            }
+        } catch (err) {
+            console.error("Analysis error:", err);
+        } finally {
+            setLoading(false);
+            setStatusMsg('');
+            setStep('details');
+        }
     };
 
     const handleSubmit = async () => {
@@ -51,7 +91,8 @@ export default function CameraPage() {
                 timestamp: new Date().toISOString(),
                 status: 'pending',
                 userId: auth.currentUser?.uid || 'anonymous',
-                userEmail: auth.currentUser?.email || 'anonymous'
+                userEmail: auth.currentUser?.email || 'anonymous',
+                aiAnalysis: aiAnalysis || null // Store AI result if available
             };
 
             if (isOffline) {
@@ -107,21 +148,77 @@ export default function CameraPage() {
         }
     };
 
+    if (step === 'selection') {
+        return (
+            <div className="min-h-screen bg-slate-50 flex flex-col p-6">
+                <div className="mb-6">
+                    <Link href="/dashboard/reporter">
+                        <Button variant="ghost" className="-ml-3 text-slate-600">
+                            <ArrowLeft className="w-5 h-5 mr-2" /> Back to Dashboard
+                        </Button>
+                    </Link>
+                    <h1 className="text-2xl font-bold text-slate-900 mt-4">New Report</h1>
+                    <p className="text-slate-500">Choose how you want to capture the erosion.</p>
+                </div>
+
+                <div className="flex-1 flex flex-col justify-center gap-6 max-w-md mx-auto w-full">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl shadow-sm border border-slate-100">
+                            <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+                            <p className="text-slate-600 font-medium">{statusMsg || 'Processing...'}</p>
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => setStep('camera')}
+                                className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-primary hover:shadow-md transition-all group"
+                            >
+                                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
+                                    <Camera className="w-8 h-8 text-blue-600" />
+                                </div>
+                                <span className="text-lg font-bold text-slate-800">Live Camera</span>
+                                <span className="text-sm text-slate-500 mt-1">Take a photo now</span>
+                            </button>
+
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    accept="image/png, image/jpeg, image/jpg"
+                                    onChange={handleFileUpload}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                />
+                                <div className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-purple-500 hover:shadow-md transition-all group">
+                                    <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mb-4 group-hover:bg-purple-100 transition-colors">
+                                        <Upload className="w-8 h-8 text-purple-600" />
+                                    </div>
+                                    <span className="text-lg font-bold text-slate-800">Upload File</span>
+                                    <span className="text-sm text-slate-500 mt-1">Select from Gallery</span>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     if (step === 'camera') {
         return (
             <div className="h-[100dvh] bg-black relative flex flex-col">
                 <div className="absolute top-4 left-4 z-50">
-                    <Link href="/dashboard/reporter">
-                        <Button variant="ghost" className="text-white hover:bg-white/20 rounded-full">
-                            <ArrowLeft className="w-6 h-6" />
-                        </Button>
-                    </Link>
+                    <Button
+                        variant="ghost"
+                        className="text-white hover:bg-white/20 rounded-full"
+                        onClick={() => setStep('selection')}
+                    >
+                        <ArrowLeft className="w-6 h-6" />
+                    </Button>
                 </div>
 
                 <div className="flex-1 relative">
                     <CameraCapture
                         onCapture={handleCapture}
-                        onCancel={() => router.push('/dashboard/reporter')}
+                        onCancel={() => setStep('selection')}
                     />
                 </div>
             </div>
@@ -131,14 +228,14 @@ export default function CameraPage() {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
             <div className="bg-white p-4 flex items-center shadow-sm sticky top-0 z-10">
-                <Button variant="ghost" size="icon" onClick={() => setStep('camera')} disabled={loading}>
+                <Button variant="ghost" size="icon" onClick={() => setStep('selection')} disabled={loading}>
                     <ArrowLeft className="w-5 h-5 text-slate-600" />
                 </Button>
                 <h1 className="ml-2 text-lg font-bold text-slate-800">Add Details</h1>
             </div>
 
             <div className="p-4 space-y-6 flex-1">
-                <div className="h-64 w-full bg-slate-200 rounded-2xl overflow-hidden shadow-md relative">
+                <div className="h-64 w-full bg-slate-200 rounded-2xl overflow-hidden shadow-md relative group">
                     {previewUrl && (
                         <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                     )}
@@ -147,6 +244,25 @@ export default function CameraPage() {
                         {latitude ? `${latitude.toFixed(4)}, ${longitude?.toFixed(4)}` : 'Locating...'}
                     </div>
                 </div>
+
+                {aiAnalysis && (
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span className="text-lg">🤖</span>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-blue-900 text-sm">AI Analysis Result</h3>
+                                <p className="text-xs text-blue-700 mt-1">
+                                    <span className="font-semibold">{aiAnalysis.prediction}</span> ({(aiAnalysis.confidence * 100).toFixed(0)}% confidence)
+                                </p>
+                                <p className="text-[10px] text-blue-600 mt-1">
+                                    Detected {aiAnalysis.soil_analysis.type}. {aiAnalysis.reasoning[0]}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-4">
                     <div>

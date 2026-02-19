@@ -53,11 +53,11 @@ export default function SignIn() {
             <main className="flex-1 flex items-center justify-center p-4 z-10">
                 <div className="w-full max-w-md space-y-6">
                     <div className="text-center space-y-2">
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome Back</h1>
-                        <p className="text-slate-500">Sign in to manage your reports</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-primary">Welcome Back</h1>
+                        <p className="text-primary/90">Sign in to manage your reports</p>
                     </div>
 
-                    <Card className="border-border/50 shadow-xl shadow-slate-200/50">
+                    <Card className="border-border/50 shadow-xl shadow-slate-200/50 dark:shadow-none">
                         <CardContent className="pt-6">
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="space-y-2">
@@ -67,7 +67,7 @@ export default function SignIn() {
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         required
-                                        className="h-12 bg-slate-50 border-border focus:border-primary focus:ring-primary/20 rounded-xl"
+                                        className="h-12 bg-slate-50 dark:bg-secondary/50 border-border focus:border-primary focus:ring-primary/20 rounded-xl"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -77,7 +77,7 @@ export default function SignIn() {
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
-                                        className="h-12 bg-slate-50 border-border focus:border-primary focus:ring-primary/20 rounded-xl"
+                                        className="h-12 bg-slate-50 dark:bg-secondary/50 border-border focus:border-primary focus:ring-primary/20 rounded-xl"
                                     />
                                 </div>
                                 {error && <p className="text-red-500 text-sm font-medium bg-red-50 p-3 rounded-lg border border-red-100">{error}</p>}
